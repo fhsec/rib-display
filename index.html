@@ -99,59 +99,79 @@
         // Display station info
         document.getElementById('station-info').textContent = 'Station: ' + station;
         
-        // Array of image paths - these are fixed names, the station directory changes
-        const imageFileNames = [
-            'screenshot1.png',
-            'screenshot2.png',
-            'screenshot3.png'
-            // Add more image names as needed
-        ];
+        // Define maximum number of screenshots to try loading
+        const maxScreenshots = 10; // Try up to 10 screenshots
         
         // Initialize variables
         let currentIndex = 0;
         const container = document.getElementById('image-container');
         let loadedImages = 0;
         let hasError = false;
+        const loadedScreenshots = []; // Array to store successfully loaded screenshots
         
         // Create image elements 
         function createImageElements() {
             // Clear container first
             container.innerHTML = '';
             
-            // Keep track of how many images we've attempted to load
-            let attemptedLoads = 0;
+            let loadingPromises = [];
             
-            // For each image filename, try to create an image element
-            imageFileNames.forEach((filename, index) => {
+            // Try to load screenshots with both PNG and JPG extensions
+            for (let i = 1; i <= maxScreenshots; i++) {
+                // Try PNG first
+                loadingPromises.push(tryLoadImage(`screenshot${i}.png`, i));
+                
+                // Also try JPG
+                loadingPromises.push(tryLoadImage(`screenshot${i}.jpg`, i));
+            }
+            
+            // After all attempts are complete, check if we loaded any images
+            Promise.all(loadingPromises).then(() => {
+                if (loadedScreenshots.length === 0) {
+                    hasError = true;
+                    showError(`No images found for station ${station}.`);
+                } else {
+                    // Sort the loaded screenshots by their index
+                    loadedScreenshots.sort((a, b) => a.index - b.index);
+                    
+                    // Add all loaded screenshots to the container
+                    loadedScreenshots.forEach((screenshot, idx) => {
+                        container.appendChild(screenshot.element);
+                        if (idx === 0) {
+                            screenshot.element.classList.add('active');
+                        }
+                    });
+                }
+            });
+        }
+        
+        // Try to load an image and return a promise
+        function tryLoadImage(filename, index) {
+            return new Promise(resolve => {
                 const img = document.createElement('img');
                 img.className = 'screenshot';
-                img.alt = `Screenshot ${index + 1}`;
+                img.alt = `Screenshot ${index}`;
                 
-                // Set up load and error handlers before setting src
+                // Resolve the promise whether the image loads or not
                 img.onload = function() {
-                    loadedImages++;
-                    
-                    // Make the first image visible when it loads
-                    if (index === 0) {
-                        img.classList.add('active');
+                    // Add to our collection of loaded screenshots
+                    // Only add if we don't already have this index (avoid duplicates if both PNG and JPG exist)
+                    if (!loadedScreenshots.some(s => s.index === index)) {
+                        loadedScreenshots.push({
+                            index: index,
+                            element: img
+                        });
                     }
+                    resolve();
                 };
                 
                 img.onerror = function() {
-                    // Remove this image since it failed to load
-                    img.remove();
-                    
-                    // If all images failed to load, show an error
-                    attemptedLoads++;
-                    if (attemptedLoads === imageFileNames.length && loadedImages === 0) {
-                        hasError = true;
-                        showError(`No images found for station ${station}.`);
-                    }
+                    // Image failed to load - that's ok, we'll try other formats or indices
+                    resolve();
                 };
                 
-                // Now set the src to trigger loading
+                // Set the source to trigger loading
                 img.src = basePath + filename;
-                container.appendChild(img);
             });
         }
         
@@ -162,19 +182,16 @@
         
         // Rotate images
         function rotateImages() {
-            if (hasError) return;
-            
-            const screenshots = document.querySelectorAll('.screenshot');
-            if (screenshots.length === 0) return;
+            if (hasError || loadedScreenshots.length === 0) return;
             
             // Hide current image
-            screenshots[currentIndex].classList.remove('active');
+            loadedScreenshots[currentIndex].element.classList.remove('active');
             
             // Update index to next image
-            currentIndex = (currentIndex + 1) % screenshots.length;
+            currentIndex = (currentIndex + 1) % loadedScreenshots.length;
             
             // Show next image
-            screenshots[currentIndex].classList.add('active');
+            loadedScreenshots[currentIndex].element.classList.add('active');
         }
         
         // Initialize
@@ -187,29 +204,26 @@
         
         // Add keyboard controls for manual navigation (optional)
         document.addEventListener('keydown', (event) => {
-            if (hasError) return;
-            
-            const screenshots = document.querySelectorAll('.screenshot');
-            if (screenshots.length === 0) return;
+            if (hasError || loadedScreenshots.length === 0) return;
             
             if (event.key === 'ArrowRight') {
                 // Hide current image
-                screenshots[currentIndex].classList.remove('active');
+                loadedScreenshots[currentIndex].element.classList.remove('active');
                 
                 // Update index to next image
-                currentIndex = (currentIndex + 1) % screenshots.length;
+                currentIndex = (currentIndex + 1) % loadedScreenshots.length;
                 
                 // Show next image
-                screenshots[currentIndex].classList.add('active');
+                loadedScreenshots[currentIndex].element.classList.add('active');
             } else if (event.key === 'ArrowLeft') {
                 // Hide current image
-                screenshots[currentIndex].classList.remove('active');
+                loadedScreenshots[currentIndex].element.classList.remove('active');
                 
                 // Update index to previous image
-                currentIndex = (currentIndex - 1 + screenshots.length) % screenshots.length;
+                currentIndex = (currentIndex - 1 + loadedScreenshots.length) % loadedScreenshots.length;
                 
                 // Show next image
-                screenshots[currentIndex].classList.add('active');
+                loadedScreenshots[currentIndex].element.classList.add('active');
             }
         });
     </script>
