@@ -27,11 +27,11 @@
         
         .screenshot {
             position: absolute;
-            max-width: 100%;
-            max-height: 100%;
+            width: 100%;
+            height: 100%;
             opacity: 0;
             transition: opacity 1s ease-in-out;
-            object-fit: contain;
+            object-fit: cover; /* Changed from 'contain' to 'cover' to stretch/fill screen */
         }
         
         .active {
@@ -49,6 +49,7 @@
             background-color: rgba(0, 0, 0, 0.5);
             border-radius: 3px;
             opacity: 0.5;
+            z-index: 10; /* Ensure it's above the images */
         }
         
         #error-message {
@@ -58,6 +59,34 @@
             text-align: center;
             margin: 20% auto;
         }
+        
+        /* Added styles for fitting options */
+        .fit-options {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+            opacity: 0.3;
+            transition: opacity 0.3s;
+        }
+        
+        .fit-options:hover {
+            opacity: 1;
+        }
+        
+        .fit-button {
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            margin-left: 5px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        
+        .fit-button.active {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
     </style>
 </head>
 <body>
@@ -65,6 +94,12 @@
         <!-- Images will be inserted here by JavaScript -->
     </div>
     <div id="station-info"></div>
+    
+    <!-- Added fit options controls -->
+    <div class="fit-options">
+        <button class="fit-button" id="btn-cover">Fill</button>
+        <button class="fit-button" id="btn-contain">Fit</button>
+    </div>
 
     <script>
         // List of valid stations
@@ -88,9 +123,17 @@
         // Get station from URL parameter, default to first station if not specified or invalid
         let station = getUrlParameter('station') || validStations[0];
         
+        // Get fitting mode from URL parameter, default to 'cover' (stretch to fill)
+        let fitMode = getUrlParameter('fit') || 'cover';
+        
         // Validate station
         if (!validStations.includes(station)) {
             station = validStations[0];
+        }
+        
+        // Validate fit mode
+        if (!['cover', 'contain'].includes(fitMode)) {
+            fitMode = 'cover';
         }
         
         // Base path for images
@@ -98,6 +141,38 @@
         
         // Display station info
         document.getElementById('station-info').textContent = 'Station: ' + station;
+        
+        // Update fit mode buttons
+        document.getElementById('btn-cover').classList.toggle('active', fitMode === 'cover');
+        document.getElementById('btn-contain').classList.toggle('active', fitMode === 'contain');
+        
+        // Add event listeners to fit mode buttons
+        document.getElementById('btn-cover').addEventListener('click', () => {
+            setFitMode('cover');
+        });
+        
+        document.getElementById('btn-contain').addEventListener('click', () => {
+            setFitMode('contain');
+        });
+        
+        // Function to set fitting mode
+        function setFitMode(mode) {
+            fitMode = mode;
+            
+            // Update buttons
+            document.getElementById('btn-cover').classList.toggle('active', mode === 'cover');
+            document.getElementById('btn-contain').classList.toggle('active', mode === 'contain');
+            
+            // Update all screenshots
+            document.querySelectorAll('.screenshot').forEach(img => {
+                img.style.objectFit = mode;
+            });
+            
+            // Update URL parameter without reloading
+            const url = new URL(window.location);
+            url.searchParams.set('fit', mode);
+            window.history.pushState({}, '', url);
+        }
         
         // Define maximum number of screenshots to try loading
         const maxScreenshots = 10; // Try up to 10 screenshots
@@ -136,6 +211,9 @@
                     
                     // Add all loaded screenshots to the container
                     loadedScreenshots.forEach((screenshot, idx) => {
+                        // Apply current fit mode
+                        screenshot.element.style.objectFit = fitMode;
+                        
                         container.appendChild(screenshot.element);
                         if (idx === 0) {
                             screenshot.element.classList.add('active');
@@ -151,6 +229,7 @@
                 const img = document.createElement('img');
                 img.className = 'screenshot';
                 img.alt = `Screenshot ${index}`;
+                img.style.objectFit = fitMode; // Apply fit mode
                 
                 // Resolve the promise whether the image loads or not
                 img.onload = function() {
@@ -194,12 +273,29 @@
             loadedScreenshots[currentIndex].element.classList.add('active');
         }
         
+        // Auto-hide controls after inactivity
+        let activityTimeout;
+        function resetActivityTimeout() {
+            clearTimeout(activityTimeout);
+            document.querySelector('.fit-options').style.display = 'block';
+            
+            activityTimeout = setTimeout(() => {
+                document.querySelector('.fit-options').style.display = 'none';
+            }, 5000); // Hide after 5 seconds of inactivity
+        }
+        
+        // Track mouse movement to show/hide controls
+        document.addEventListener('mousemove', resetActivityTimeout);
+        
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             createImageElements();
             
             // Set rotation interval (20 seconds)
             setInterval(rotateImages, 20000);
+            
+            // Initially hide controls after a delay
+            resetActivityTimeout();
         });
         
         // Add keyboard controls for manual navigation (optional)
@@ -215,6 +311,9 @@
                 
                 // Show next image
                 loadedScreenshots[currentIndex].element.classList.add('active');
+                
+                // Reset activity timeout
+                resetActivityTimeout();
             } else if (event.key === 'ArrowLeft') {
                 // Hide current image
                 loadedScreenshots[currentIndex].element.classList.remove('active');
@@ -224,6 +323,15 @@
                 
                 // Show next image
                 loadedScreenshots[currentIndex].element.classList.add('active');
+                
+                // Reset activity timeout
+                resetActivityTimeout();
+            } else if (event.key === 'f') {
+                // Toggle between fit modes
+                setFitMode(fitMode === 'cover' ? 'contain' : 'cover');
+                
+                // Reset activity timeout
+                resetActivityTimeout();
             }
         });
     </script>
