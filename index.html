@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screenshot Rotator</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            background-color: #000;
+        }
+        
+        #image-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .screenshot {
+            position: absolute;
+            max-width: 100%;
+            max-height: 100%;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+            object-fit: contain;
+        }
+        
+        .active {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div id="image-container">
+        <!-- Images will be inserted here by JavaScript -->
+    </div>
+
+    <script>
+        // Array of image paths - replace with your actual screenshot filenames
+        const images = [
+            'images/screenshot1.jpg',
+            'images/screenshot2.jpg',
+            'images/screenshot3.jpg'
+            // Add more images as needed
+        ];
+        
+        let currentIndex = 0;
+        const container = document.getElementById('image-container');
+        
+        // Create image elements
+        function createImageElements() {
+            images.forEach((src, index) => {
+                const img = document.createElement('img');
+                img.src = src;
+                img.className = 'screenshot';
+                img.alt = `Screenshot ${index + 1}`;
+                
+                // Make the first image visible
+                if (index === 0) {
+                    img.classList.add('active');
+                }
+                
+                container.appendChild(img);
+            });
+        }
+        
+        // Rotate images
+        function rotateImages() {
+            const screenshots = document.querySelectorAll('.screenshot');
+            
+            // Hide current image
+            screenshots[currentIndex].classList.remove('active');
+            
+            // Update index to next image
+            currentIndex = (currentIndex + 1) % images.length;
+            
+            // Show next image
+            screenshots[currentIndex].classList.add('active');
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            createImageElements();
+            
+            // Set rotation interval (20 seconds)
+            setInterval(rotateImages, 20000);
+        });
+        
+        // Add keyboard controls for manual navigation (optional)
+        document.addEventListener('keydown', (event) => {
+            const screenshots = document.querySelectorAll('.screenshot');
+            
+            if (event.key === 'ArrowRight') {
+                // Hide current image
+                screenshots[currentIndex].classList.remove('active');
+                
+                // Update index to next image
+                currentIndex = (currentIndex + 1) % images.length;
+                
+                // Show next image
+                screenshots[currentIndex].classList.add('active');
+            } else if (event.key === 'ArrowLeft') {
+                // Hide current image
+                screenshots[currentIndex].classList.remove('active');
+                
+                // Update index to previous image
+                currentIndex = (currentIndex - 1 + images.length) % images.length;
+                
+                // Show next image
+                screenshots[currentIndex].classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html>
