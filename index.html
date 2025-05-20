@@ -37,51 +37,141 @@
         .active {
             opacity: 1;
         }
+        
+        #station-info {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            padding: 5px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 3px;
+            opacity: 0.5;
+        }
+        
+        #error-message {
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 24px;
+            text-align: center;
+            margin: 20% auto;
+        }
     </style>
 </head>
 <body>
     <div id="image-container">
         <!-- Images will be inserted here by JavaScript -->
     </div>
+    <div id="station-info"></div>
 
     <script>
-        // Array of image paths - replace with your actual screenshot filenames
-        const images = [
-            'images/screenshot1.png',
-            'images/screenshot2.png',
-            'images/screenshot3.png'
-            // Add more images as needed
+        // List of valid stations
+        const validStations = [
+            '234-1000', 
+            '234-1100', 
+            '234-1200', 
+            '234-1300', 
+            '234-1400', 
+            '234-2000'
         ];
         
+        // Function to get URL parameters
+        function getUrlParameter(name) {
+            name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+            const regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+            const results = regex.exec(location.search);
+            return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+        }
+        
+        // Get station from URL parameter, default to first station if not specified or invalid
+        let station = getUrlParameter('station') || validStations[0];
+        
+        // Validate station
+        if (!validStations.includes(station)) {
+            station = validStations[0];
+        }
+        
+        // Base path for images
+        const basePath = 'images/' + station + '/';
+        
+        // Display station info
+        document.getElementById('station-info').textContent = 'Station: ' + station;
+        
+        // Array of image paths - these are fixed names, the station directory changes
+        const imageFileNames = [
+            'screenshot1.jpg',
+            'screenshot2.jpg',
+            'screenshot3.jpg'
+            // Add more image names as needed
+        ];
+        
+        // Initialize variables
         let currentIndex = 0;
         const container = document.getElementById('image-container');
+        let loadedImages = 0;
+        let hasError = false;
         
-        // Create image elements
+        // Create image elements 
         function createImageElements() {
-            images.forEach((src, index) => {
+            // Clear container first
+            container.innerHTML = '';
+            
+            // Keep track of how many images we've attempted to load
+            let attemptedLoads = 0;
+            
+            // For each image filename, try to create an image element
+            imageFileNames.forEach((filename, index) => {
                 const img = document.createElement('img');
-                img.src = src;
                 img.className = 'screenshot';
                 img.alt = `Screenshot ${index + 1}`;
                 
-                // Make the first image visible
-                if (index === 0) {
-                    img.classList.add('active');
-                }
+                // Set up load and error handlers before setting src
+                img.onload = function() {
+                    loadedImages++;
+                    
+                    // Make the first image visible when it loads
+                    if (index === 0) {
+                        img.classList.add('active');
+                    }
+                };
                 
+                img.onerror = function() {
+                    // Remove this image since it failed to load
+                    img.remove();
+                    
+                    // If all images failed to load, show an error
+                    attemptedLoads++;
+                    if (attemptedLoads === imageFileNames.length && loadedImages === 0) {
+                        hasError = true;
+                        showError(`No images found for station ${station}.`);
+                    }
+                };
+                
+                // Now set the src to trigger loading
+                img.src = basePath + filename;
                 container.appendChild(img);
             });
         }
         
+        // Show error message
+        function showError(message) {
+            container.innerHTML = `<div id="error-message">${message}</div>`;
+        }
+        
         // Rotate images
         function rotateImages() {
+            if (hasError) return;
+            
             const screenshots = document.querySelectorAll('.screenshot');
+            if (screenshots.length === 0) return;
             
             // Hide current image
             screenshots[currentIndex].classList.remove('active');
             
             // Update index to next image
-            currentIndex = (currentIndex + 1) % images.length;
+            currentIndex = (currentIndex + 1) % screenshots.length;
             
             // Show next image
             screenshots[currentIndex].classList.add('active');
@@ -97,14 +187,17 @@
         
         // Add keyboard controls for manual navigation (optional)
         document.addEventListener('keydown', (event) => {
+            if (hasError) return;
+            
             const screenshots = document.querySelectorAll('.screenshot');
+            if (screenshots.length === 0) return;
             
             if (event.key === 'ArrowRight') {
                 // Hide current image
                 screenshots[currentIndex].classList.remove('active');
                 
                 // Update index to next image
-                currentIndex = (currentIndex + 1) % images.length;
+                currentIndex = (currentIndex + 1) % screenshots.length;
                 
                 // Show next image
                 screenshots[currentIndex].classList.add('active');
@@ -113,7 +206,7 @@
                 screenshots[currentIndex].classList.remove('active');
                 
                 // Update index to previous image
-                currentIndex = (currentIndex - 1 + images.length) % images.length;
+                currentIndex = (currentIndex - 1 + screenshots.length) % screenshots.length;
                 
                 // Show next image
                 screenshots[currentIndex].classList.add('active');
