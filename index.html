@@ -52,6 +52,20 @@
             z-index: 10;
         }
         
+        #week-info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            padding: 5px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 3px;
+            opacity: 0.3; /* Always dimmed for TV display */
+            z-index: 10;
+        }
+        
         #error-message {
             color: white;
             font-family: Arial, sans-serif;
@@ -66,6 +80,7 @@
         <!-- Images will be inserted here by JavaScript -->
     </div>
     <div id="station-info"></div>
+    <div id="week-info"></div>
 
     <script>
         // List of valid stations
@@ -91,9 +106,6 @@
         
         // Get fitting mode from URL parameter, default to 'cover' (stretch to fill)
         let fitMode = getUrlParameter('fit') || 'cover';
-        
-        // Get active week from URL parameter
-        let activeWeek = getUrlParameter('week');
         
         // Validate station
         if (!validStations.includes(station)) {
@@ -124,12 +136,16 @@
         // Current week and available weeks (will be populated later)
         const currentWeek = getCurrentWeekNumber();
         let availableWeeks = [];
+        let weekImages = []; // Array to store week images
+        let currentWeekIndex = 0; // Index of current week in rotation
         
         // Initialize variables
-        let currentIndex = 0;
+        let currentImageIndex = 0;
         const container = document.getElementById('image-container');
+        const weekInfo = document.getElementById('week-info');
         let hasError = false;
-        const loadedScreenshots = []; // Array to store successfully loaded screenshots
+        let useSequentialRotation = false;
+        const loadedScreenshots = []; // Array to store sequential screenshots
         
         // Load week files for this station
         async function loadWeekFiles() {
@@ -153,7 +169,7 @@
             
             // Check each potential week
             availableWeeks = [];
-            const weeksWithImages = [];
+            weekImages = [];
             
             for (const week of potentialWeeks) {
                 // Check for week files
@@ -162,49 +178,58 @@
                 
                 if (result.exists) {
                     availableWeeks.push(week.toString());
-                    weeksWithImages.push({
+                    weekImages.push({
                         week: week.toString(),
                         image: result.img
                     });
                 }
             }
             
-            // If no week was specified in URL, default to the current week
-            // or first available week if current week doesn't exist
-            if (!activeWeek) {
-                // Try to find current week
-                const currentWeekImage = weeksWithImages.find(w => w.week === currentWeek.toString());
+            // If we have week images, set up week rotation
+            if (weekImages.length > 0) {
+                // Start with the current week if available
+                currentWeekIndex = weekImages.findIndex(w => w.week === currentWeek.toString());
+                if (currentWeekIndex === -1) currentWeekIndex = 0;
                 
-                if (currentWeekImage) {
-                    activeWeek = currentWeek.toString();
-                } else if (availableWeeks.length > 0) {
-                    activeWeek = availableWeeks[0];
-                } else {
-                    activeWeek = currentWeek.toString();
-                }
-            }
-            
-            // Load and display images for the active week
-            if (weeksWithImages.length > 0) {
-                const activeWeekImage = weeksWithImages.find(w => w.week === activeWeek);
+                // Display the initial week
+                displayWeek(currentWeekIndex);
                 
-                if (activeWeekImage) {
-                    // Clear container
-                    container.innerHTML = '';
-                    
-                    // Add the image
-                    const img = activeWeekImage.image;
-                    img.className = 'screenshot active';
-                    img.style.objectFit = fitMode;
-                    container.appendChild(img);
-                } else {
-                    // Try to load sequential images as fallback
-                    loadSequentialImages();
+                // Start rotation between weeks if we have multiple
+                if (weekImages.length > 1) {
+                    setInterval(rotateWeeks, 20000); // Rotate weeks every 20 seconds
                 }
             } else {
                 // No week files found, fall back to sequential images
+                useSequentialRotation = true;
                 loadSequentialImages();
             }
+        }
+        
+        // Display a specific week's image
+        function displayWeek(index) {
+            // Clear container
+            container.innerHTML = '';
+            
+            // Add the image
+            const weekData = weekImages[index];
+            const img = weekData.image.cloneNode();
+            img.className = 'screenshot active';
+            img.style.objectFit = fitMode;
+            container.appendChild(img);
+            
+            // Update week info
+            weekInfo.textContent = `Vecka ${weekData.week}`;
+        }
+        
+        // Rotate between available weeks
+        function rotateWeeks() {
+            if (hasError || weekImages.length === 0) return;
+            
+            // Update index to next week
+            currentWeekIndex = (currentWeekIndex + 1) % weekImages.length;
+            
+            // Show next week
+            displayWeek(currentWeekIndex);
         }
         
         // Load sequential images (traditional method) if week files aren't found
@@ -212,6 +237,9 @@
             // Clear container
             container.innerHTML = '';
             loadedScreenshots.length = 0;
+            
+            // Update week info to show no specific week
+            weekInfo.textContent = "";
             
             // Define maximum number of screenshots to try loading
             const maxScreenshots = 10;
@@ -288,18 +316,18 @@
             container.innerHTML = `<div id="error-message">${message}</div>`;
         }
         
-        // Rotate images
+        // Rotate images (for sequential mode)
         function rotateImages() {
-            if (hasError || loadedScreenshots.length === 0) return;
+            if (hasError || loadedScreenshots.length === 0 || !useSequentialRotation) return;
             
             // Hide current image
-            loadedScreenshots[currentIndex].element.classList.remove('active');
+            loadedScreenshots[currentImageIndex].element.classList.remove('active');
             
             // Update index to next image
-            currentIndex = (currentIndex + 1) % loadedScreenshots.length;
+            currentImageIndex = (currentImageIndex + 1) % loadedScreenshots.length;
             
             // Show next image
-            loadedScreenshots[currentIndex].element.classList.add('active');
+            loadedScreenshots[currentImageIndex].element.classList.add('active');
         }
         
         // Initialize
