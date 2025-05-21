@@ -48,7 +48,7 @@
             padding: 5px;
             background-color: rgba(0, 0, 0, 0.5);
             border-radius: 3px;
-            opacity: 0.5;
+            opacity: 0.3; /* Always dimmed for TV display */
             z-index: 10;
         }
         
@@ -92,6 +92,9 @@
         // Get fitting mode from URL parameter, default to 'cover' (stretch to fill)
         let fitMode = getUrlParameter('fit') || 'cover';
         
+        // Get active week from URL parameter
+        let activeWeek = getUrlParameter('week');
+        
         // Validate station
         if (!validStations.includes(station)) {
             station = validStations[0];
@@ -108,21 +111,110 @@
         // Display station info
         document.getElementById('station-info').textContent = 'Station: ' + station;
         
-        // Define maximum number of screenshots to try loading
-        const maxScreenshots = 10; // Try up to 10 screenshots
+        // Function to get current week number
+        function getCurrentWeekNumber() {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), 0, 1);
+            const diff = now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60 * 1000;
+            const oneDay = 1000 * 60 * 60 * 24;
+            const dayOfYear = Math.floor(diff / oneDay);
+            return Math.ceil(dayOfYear / 7);
+        }
+        
+        // Current week and available weeks (will be populated later)
+        const currentWeek = getCurrentWeekNumber();
+        let availableWeeks = [];
         
         // Initialize variables
         let currentIndex = 0;
         const container = document.getElementById('image-container');
-        let loadedImages = 0;
         let hasError = false;
         const loadedScreenshots = []; // Array to store successfully loaded screenshots
         
-        // Create image elements 
-        function createImageElements() {
-            // Clear container first
-            container.innerHTML = '';
+        // Load week files for this station
+        async function loadWeekFiles() {
+            // Generate potential week files to check
+            const potentialWeeks = [];
             
+            // Add current week and up to 5 weeks ahead
+            for (let i = 0; i < 6; i++) {
+                potentialWeeks.push(currentWeek + i);
+            }
+            
+            // Function to check if an image exists
+            async function imageExists(url) {
+                return new Promise(resolve => {
+                    const img = new Image();
+                    img.onload = () => resolve({ exists: true, img });
+                    img.onerror = () => resolve({ exists: false });
+                    img.src = url;
+                });
+            }
+            
+            // Check each potential week
+            availableWeeks = [];
+            const weeksWithImages = [];
+            
+            for (const week of potentialWeeks) {
+                // Check for week files
+                const weekUrl = basePath + `week_${week}.png`;
+                const result = await imageExists(weekUrl);
+                
+                if (result.exists) {
+                    availableWeeks.push(week.toString());
+                    weeksWithImages.push({
+                        week: week.toString(),
+                        image: result.img
+                    });
+                }
+            }
+            
+            // If no week was specified in URL, default to the current week
+            // or first available week if current week doesn't exist
+            if (!activeWeek) {
+                // Try to find current week
+                const currentWeekImage = weeksWithImages.find(w => w.week === currentWeek.toString());
+                
+                if (currentWeekImage) {
+                    activeWeek = currentWeek.toString();
+                } else if (availableWeeks.length > 0) {
+                    activeWeek = availableWeeks[0];
+                } else {
+                    activeWeek = currentWeek.toString();
+                }
+            }
+            
+            // Load and display images for the active week
+            if (weeksWithImages.length > 0) {
+                const activeWeekImage = weeksWithImages.find(w => w.week === activeWeek);
+                
+                if (activeWeekImage) {
+                    // Clear container
+                    container.innerHTML = '';
+                    
+                    // Add the image
+                    const img = activeWeekImage.image;
+                    img.className = 'screenshot active';
+                    img.style.objectFit = fitMode;
+                    container.appendChild(img);
+                } else {
+                    // Try to load sequential images as fallback
+                    loadSequentialImages();
+                }
+            } else {
+                // No week files found, fall back to sequential images
+                loadSequentialImages();
+            }
+        }
+        
+        // Load sequential images (traditional method) if week files aren't found
+        async function loadSequentialImages() {
+            // Clear container
+            container.innerHTML = '';
+            loadedScreenshots.length = 0;
+            
+            // Define maximum number of screenshots to try loading
+            const maxScreenshots = 10;
             let loadingPromises = [];
             
             // Try to load screenshots with both PNG and JPG extensions
@@ -135,24 +227,29 @@
             }
             
             // After all attempts are complete, check if we loaded any images
-            Promise.all(loadingPromises).then(() => {
-                if (loadedScreenshots.length === 0) {
-                    hasError = true;
-                    showError(`No images found for station ${station}.`);
-                } else {
-                    // Sort the loaded screenshots by their index
-                    loadedScreenshots.sort((a, b) => a.index - b.index);
-                    
-                    // Add all loaded screenshots to the container
-                    loadedScreenshots.forEach((screenshot, idx) => {
-                        screenshot.element.style.objectFit = fitMode;
-                        container.appendChild(screenshot.element);
-                        if (idx === 0) {
-                            screenshot.element.classList.add('active');
-                        }
-                    });
+            await Promise.all(loadingPromises);
+            
+            if (loadedScreenshots.length === 0) {
+                hasError = true;
+                showError(`Inga bilder hittades för station ${station}.`);
+            } else {
+                // Sort the loaded screenshots by their index
+                loadedScreenshots.sort((a, b) => a.index - b.index);
+                
+                // Add all loaded screenshots to the container
+                loadedScreenshots.forEach((screenshot, idx) => {
+                    screenshot.element.style.objectFit = fitMode;
+                    container.appendChild(screenshot.element);
+                    if (idx === 0) {
+                        screenshot.element.classList.add('active');
+                    }
+                });
+                
+                // Start rotation if we have multiple screenshots
+                if (loadedScreenshots.length > 1) {
+                    setInterval(rotateImages, 20000);
                 }
-            });
+            }
         }
         
         // Try to load an image and return a promise
@@ -185,6 +282,7 @@
                 img.src = basePath + filename;
             });
         }
+        
         // Show error message
         function showError(message) {
             container.innerHTML = `<div id="error-message">${message}</div>`;
@@ -206,40 +304,12 @@
         
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
-            createImageElements();
+            loadWeekFiles();
             
-            // Set rotation interval (20 seconds)
-            setInterval(rotateImages, 20000);
-            
-            // Auto refresh page every hour to get new images
+            // Auto refresh page every 5 minutes to get new images
             setTimeout(() => {
                 window.location.reload();
-            }, 60 * 60 * 1000); // 1 hour
-        });
-        
-        // Optional: Add keyboard navigation for setup purposes
-        document.addEventListener('keydown', (event) => {
-            if (hasError || loadedScreenshots.length === 0) return;
-            
-            if (event.key === 'ArrowRight') {
-                // Hide current image
-                loadedScreenshots[currentIndex].element.classList.remove('active');
-                
-                // Update index to next image
-                currentIndex = (currentIndex + 1) % loadedScreenshots.length;
-                
-                // Show next image
-                loadedScreenshots[currentIndex].element.classList.add('active');
-            } else if (event.key === 'ArrowLeft') {
-                // Hide current image
-                loadedScreenshots[currentIndex].element.classList.remove('active');
-                
-                // Update index to previous image
-                currentIndex = (currentIndex - 1 + loadedScreenshots.length) % loadedScreenshots.length;
-                
-                // Show next image
-                loadedScreenshots[currentIndex].element.classList.add('active');
-            }
+            }, 5 * 60 * 1000); // 5 minutes
         });
     </script>
 </body>
