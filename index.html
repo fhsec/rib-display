@@ -147,63 +147,78 @@
         let useSequentialRotation = false;
         const loadedScreenshots = []; // Array to store sequential screenshots
         
-        // Load week files for this station
-        async function loadWeekFiles() {
-            // Generate potential week files to check
-            const potentialWeeks = [];
-            
-            // Add current week and up to 5 weeks ahead
-            for (let i = 0; i < 6; i++) {
-                potentialWeeks.push(currentWeek + i);
-            }
-            
-            // Function to check if an image exists
-            async function imageExists(url) {
-                return new Promise(resolve => {
-                    const img = new Image();
-                    img.onload = () => resolve({ exists: true, img });
-                    img.onerror = () => resolve({ exists: false });
-                    img.src = url;
-                });
-            }
-            
-            // Check each potential week
-            availableWeeks = [];
-            weekImages = [];
-            
-            for (const week of potentialWeeks) {
-                // Check for week files
-                const weekUrl = basePath + `week_${week}.png`;
-                const result = await imageExists(weekUrl);
-                
-                if (result.exists) {
-                    availableWeeks.push(week.toString());
-                    weekImages.push({
-                        week: week.toString(),
-                        image: result.img
-                    });
-                }
-            }
-            
-            // If we have week images, set up week rotation
-            if (weekImages.length > 0) {
-                // Start with the current week if available
-                currentWeekIndex = weekImages.findIndex(w => w.week === currentWeek.toString());
-                if (currentWeekIndex === -1) currentWeekIndex = 0;
-                
-                // Display the initial week
-                displayWeek(currentWeekIndex);
-                
-                // Start rotation between weeks if we have multiple
-                if (weekImages.length > 1) {
-                    setInterval(rotateWeeks, 20000); // Rotate weeks every 20 seconds
-                }
-            } else {
-                // No week files found, fall back to sequential images
-                useSequentialRotation = true;
-                loadSequentialImages();
-            }
+// Load week files for this station
+async function loadWeekFiles() {
+    // Generate potential week files to check
+    const potentialWeeks = [];
+    
+    // Add current week and up to 5 weeks ahead
+    for (let i = 0; i < 6; i++) {
+        potentialWeeks.push(currentWeek + i);
+    }
+    
+    // Function to check if an image exists
+    async function imageExists(url) {
+        return new Promise(resolve => {
+            const img = new Image();
+            img.onload = () => resolve({ exists: true, img });
+            img.onerror = () => resolve({ exists: false });
+            img.src = url;
+        });
+    }
+    
+    // Check each potential week
+    availableWeeks = [];
+    weekImages = [];
+    
+    // First, check if the current week image exists
+    const currentWeekUrl = basePath + `week_${currentWeek}.png`;
+    const currentWeekResult = await imageExists(currentWeekUrl);
+    
+    if (currentWeekResult.exists) {
+        availableWeeks.push(currentWeek.toString());
+        weekImages.push({
+            week: currentWeek.toString(),
+            image: currentWeekResult.img
+        });
+    }
+    
+    // Then check future weeks
+    for (const week of potentialWeeks) {
+        // Skip if it's the current week (already checked) or a past week
+        if (week <= currentWeek) continue;
+        
+        // Check for week files
+        const weekUrl = basePath + `week_${week}.png`;
+        const result = await imageExists(weekUrl);
+        
+        if (result.exists) {
+            availableWeeks.push(week.toString());
+            weekImages.push({
+                week: week.toString(),
+                image: result.img
+            });
         }
+    }
+    
+    // If we have week images, set up week rotation
+    if (weekImages.length > 0) {
+        // Always start with the earliest available week (which is current or future)
+        currentWeekIndex = 0;
+        
+        // Display the initial week
+        displayWeek(currentWeekIndex);
+        
+        // Start rotation between weeks if we have multiple
+        if (weekImages.length > 1) {
+            setInterval(rotateWeeks, 20000); // Rotate weeks every 20 seconds
+        }
+    } else {
+        // No week files found, fall back to sequential images
+        useSequentialRotation = true;
+        loadSequentialImages();
+    }
+}
         
         // Display a specific week's image
         function displayWeek(index) {
