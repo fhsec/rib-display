@@ -124,14 +124,32 @@
         document.getElementById('station-info').textContent = 'Station: ' + station;
         
         // Function to get current week number
-        function getCurrentWeekNumber() {
-            const now = new Date();
-            const start = new Date(now.getFullYear(), 0, 1);
-            const diff = now - start + (start.getTimezoneOffset() - now.getTimezoneOffset()) * 60 * 1000;
-            const oneDay = 1000 * 60 * 60 * 24;
-            const dayOfYear = Math.floor(diff / oneDay);
-            return Math.ceil(dayOfYear / 7);
-        }
+// Function to get ISO week number for Sweden
+function getCurrentWeekNumber() {
+    // Create date object using local time (Sweden uses CET/CEST)
+    const now = new Date();
+    
+    // Create a copy of the date object
+    const date = new Date(now.getTime());
+    
+    // ISO week starts on Monday (1) instead of Sunday (0)
+    // Set to nearest Thursday: current date + 4 - current day number
+    // Make Sunday's day number 7
+    const dayNum = date.getDay() || 7;
+    date.setDate(date.getDate() + 4 - dayNum);
+    
+    // Get first day of the year
+    const yearStart = new Date(date.getFullYear(), 0, 1);
+    
+    // Calculate full weeks to nearest Thursday
+    const weekNum = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+    
+    // Log for debugging
+    console.log("Current date:", now.toLocaleDateString('sv-SE'));
+    console.log("ISO week number:", weekNum);
+    
+    return weekNum;
+}
         
         // Current week and available weeks (will be populated later)
         const currentWeek = getCurrentWeekNumber();
