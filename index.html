@@ -23,7 +23,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            background-color: #000; /* Ensures black letterboxing areas */
+            background-color: #000;
         }
         
         .screenshot {
@@ -32,7 +32,7 @@
             height: 100%;
             opacity: 0;
             transition: opacity 1s ease-in-out;
-            object-fit: contain; /* Changed from 'cover' to 'contain' */
+            /* object-fit set dynamically in JS */
         }
         
         .active {
@@ -105,8 +105,8 @@
         // Get station from URL parameter, default to first station if not specified or invalid
         let station = getUrlParameter('station') || validStations[0];
         
-        // Get fitting mode from URL parameter, default to 'contain' (show whole image)
-        let fitMode = getUrlParameter('fit') || 'contain';
+        // Get fitting mode from URL parameter, default to 'smart' (our custom fitting approach)
+        let fitMode = getUrlParameter('fit') || 'smart';
         
         // Validate station
         if (!validStations.includes(station)) {
@@ -114,8 +114,8 @@
         }
         
         // Validate fit mode
-        if (!['cover', 'contain'].includes(fitMode)) {
-            fitMode = 'contain';
+        if (!['cover', 'contain', 'smart'].includes(fitMode)) {
+            fitMode = 'smart';
         }
         
         // Base path for images
@@ -165,6 +165,53 @@
         let useSequentialRotation = false;
         const loadedScreenshots = []; // Array to store sequential screenshots
         
+        // Function to apply smart fitting to an image
+        function applySmartFit(img) {
+            if (fitMode === 'smart') {
+                // Once the image is loaded, check its dimensions
+                if (img.complete) {
+                    smartFitImage(img);
+                } else {
+                    img.onload = function() {
+                        smartFitImage(img);
+                    };
+                }
+            } else {
+                // Use the selected fit mode directly
+                img.style.objectFit = fitMode;
+            }
+        }
+        
+        // Smart fit logic for images
+        function smartFitImage(img) {
+            // Get the natural dimensions of the image
+            const imgWidth = img.naturalWidth;
+            const imgHeight = img.naturalHeight;
+            
+            // Get screen dimensions
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
+            
+            // Calculate aspect ratios
+            const imgRatio = imgWidth / imgHeight;
+            const screenRatio = screenWidth / screenHeight;
+            
+            // For wide (landscape) images that are wider than the screen ratio
+            if (imgRatio > screenRatio) {
+                // Apply a custom transform to stretch vertically, but not too much
+                // Determine how much we need to stretch
+                const stretchRatio = Math.min(1.25, screenRatio / imgRatio);
+                
+                // Use cover combined with a scaleY transform for controlled vertical stretching
+                img.style.objectFit = 'cover';
+                img.style.transform = `scaleY(${stretchRatio})`;
+            } else {
+                // For portrait or square images, use contain
+                img.style.objectFit = 'contain';
+                img.style.transform = '';
+            }
+        }
+        
         // Load week files for this station
         async function loadWeekFiles() {
             // Generate potential week files to check
@@ -213,7 +260,7 @@
                 
                 // Start rotation between weeks if we have multiple
                 if (weekImages.length > 1) {
-                    setInterval(rotateWeeks, 20000); // Rotate weeks every 20 seconds
+                    setInterval(rotateWeeks, 15000); // Rotate weeks every 15 seconds
                 }
             } else {
                 // No week files found, fall back to sequential images
@@ -231,7 +278,10 @@
             const weekData = weekImages[index];
             const img = weekData.image.cloneNode();
             img.className = 'screenshot active';
-            img.style.objectFit = fitMode;
+            
+            // Apply appropriate fitting mode
+            applySmartFit(img);
+            
             container.appendChild(img);
             
             // Update week info
@@ -283,7 +333,9 @@
                 
                 // Add all loaded screenshots to the container
                 loadedScreenshots.forEach((screenshot, idx) => {
-                    screenshot.element.style.objectFit = fitMode;
+                    // Apply appropriate fitting mode
+                    applySmartFit(screenshot.element);
+                    
                     container.appendChild(screenshot.element);
                     if (idx === 0) {
                         screenshot.element.classList.add('active');
@@ -303,7 +355,6 @@
                 const img = document.createElement('img');
                 img.className = 'screenshot';
                 img.alt = `Screenshot ${index}`;
-                img.style.objectFit = fitMode;
                 
                 // Resolve the promise whether the image loads or not
                 img.onload = function() {
@@ -346,6 +397,20 @@
             // Show next image
             loadedScreenshots[currentImageIndex].element.classList.add('active');
         }
+        
+        // Handle window resize to adjust image fitting
+        window.addEventListener('resize', function() {
+            if (!useSequentialRotation && weekImages.length > 0) {
+                // Re-apply smart fit to current week image
+                const imgs = document.querySelectorAll('.screenshot.active');
+                if (imgs.length > 0) {
+                    applySmartFit(imgs[0]);
+                }
+            } else if (loadedScreenshots.length > 0) {
+                // Re-apply smart fit to current sequential image
+                applySmartFit(loadedScreenshots[currentImageIndex].element);
+            }
+        });
         
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
