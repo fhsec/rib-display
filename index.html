@@ -23,6 +23,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            background-color: #000; /* Ensures black letterboxing areas */
         }
         
         .screenshot {
@@ -31,7 +32,7 @@
             height: 100%;
             opacity: 0;
             transition: opacity 1s ease-in-out;
-            object-fit: cover; /* Fill the screen */
+            object-fit: contain; /* Changed from 'cover' to 'contain' */
         }
         
         .active {
@@ -104,8 +105,8 @@
         // Get station from URL parameter, default to first station if not specified or invalid
         let station = getUrlParameter('station') || validStations[0];
         
-        // Get fitting mode from URL parameter, default to 'cover' (stretch to fill)
-        let fitMode = getUrlParameter('fit') || 'cover';
+        // Get fitting mode from URL parameter, default to 'contain' (show whole image)
+        let fitMode = getUrlParameter('fit') || 'contain';
         
         // Validate station
         if (!validStations.includes(station)) {
@@ -114,7 +115,7 @@
         
         // Validate fit mode
         if (!['cover', 'contain'].includes(fitMode)) {
-            fitMode = 'cover';
+            fitMode = 'contain';
         }
         
         // Base path for images
@@ -123,33 +124,32 @@
         // Display station info
         document.getElementById('station-info').textContent = 'Station: ' + station;
         
-        // Function to get current week number
-// Function to get ISO week number for Sweden
-function getCurrentWeekNumber() {
-    // Create date object using local time (Sweden uses CET/CEST)
-    const now = new Date();
-    
-    // Create a copy of the date object
-    const date = new Date(now.getTime());
-    
-    // ISO week starts on Monday (1) instead of Sunday (0)
-    // Set to nearest Thursday: current date + 4 - current day number
-    // Make Sunday's day number 7
-    const dayNum = date.getDay() || 7;
-    date.setDate(date.getDate() + 4 - dayNum);
-    
-    // Get first day of the year
-    const yearStart = new Date(date.getFullYear(), 0, 1);
-    
-    // Calculate full weeks to nearest Thursday
-    const weekNum = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
-    
-    // Log for debugging
-    console.log("Current date:", now.toLocaleDateString('sv-SE'));
-    console.log("ISO week number:", weekNum);
-    
-    return weekNum;
-}
+        // Function to get ISO week number for Sweden
+        function getCurrentWeekNumber() {
+            // Create date object using local time (Sweden uses CET/CEST)
+            const now = new Date();
+            
+            // Create a copy of the date object
+            const date = new Date(now.getTime());
+            
+            // ISO week starts on Monday (1) instead of Sunday (0)
+            // Set to nearest Thursday: current date + 4 - current day number
+            // Make Sunday's day number 7
+            const dayNum = date.getDay() || 7;
+            date.setDate(date.getDate() + 4 - dayNum);
+            
+            // Get first day of the year
+            const yearStart = new Date(date.getFullYear(), 0, 1);
+            
+            // Calculate full weeks to nearest Thursday
+            const weekNum = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+            
+            // Log for debugging
+            console.log("Current date:", now.toLocaleDateString('sv-SE'));
+            console.log("ISO week number:", weekNum);
+            
+            return weekNum;
+        }
         
         // Current week and available weeks (will be populated later)
         const currentWeek = getCurrentWeekNumber();
@@ -165,62 +165,62 @@ function getCurrentWeekNumber() {
         let useSequentialRotation = false;
         const loadedScreenshots = []; // Array to store sequential screenshots
         
-// Load week files for this station
-async function loadWeekFiles() {
-    // Generate potential week files to check
-    const potentialWeeks = [];
-    
-    // Add current week and up to 5 weeks ahead
-    for (let i = 0; i <= 5; i++) {
-        potentialWeeks.push(currentWeek + i);
-    }
-    
-    // Function to check if an image exists
-    async function imageExists(url) {
-        return new Promise(resolve => {
-            const img = new Image();
-            img.onload = () => resolve({ exists: true, img });
-            img.onerror = () => resolve({ exists: false });
-            img.src = url;
-        });
-    }
-    
-    // Check each potential week
-    availableWeeks = [];
-    weekImages = [];
-    
-    // Check only current week and future weeks
-    for (const week of potentialWeeks) {
-        const weekUrl = basePath + `week_${week}.png`;
-        const result = await imageExists(weekUrl);
-        
-        if (result.exists) {
-            availableWeeks.push(week.toString());
-            weekImages.push({
-                week: week.toString(),
-                image: result.img
-            });
+        // Load week files for this station
+        async function loadWeekFiles() {
+            // Generate potential week files to check
+            const potentialWeeks = [];
+            
+            // Add current week and up to 5 weeks ahead
+            for (let i = 0; i <= 5; i++) {
+                potentialWeeks.push(currentWeek + i);
+            }
+            
+            // Function to check if an image exists
+            async function imageExists(url) {
+                return new Promise(resolve => {
+                    const img = new Image();
+                    img.onload = () => resolve({ exists: true, img });
+                    img.onerror = () => resolve({ exists: false });
+                    img.src = url;
+                });
+            }
+            
+            // Check each potential week
+            availableWeeks = [];
+            weekImages = [];
+            
+            // Check only current week and future weeks
+            for (const week of potentialWeeks) {
+                const weekUrl = basePath + `week_${week}.png`;
+                const result = await imageExists(weekUrl);
+                
+                if (result.exists) {
+                    availableWeeks.push(week.toString());
+                    weekImages.push({
+                        week: week.toString(),
+                        image: result.img
+                    });
+                }
+            }
+            
+            // If we have week images, set up week rotation
+            if (weekImages.length > 0) {
+                // Always start with the earliest available week
+                currentWeekIndex = 0;
+                
+                // Display the initial week
+                displayWeek(currentWeekIndex);
+                
+                // Start rotation between weeks if we have multiple
+                if (weekImages.length > 1) {
+                    setInterval(rotateWeeks, 20000); // Rotate weeks every 20 seconds
+                }
+            } else {
+                // No week files found, fall back to sequential images
+                useSequentialRotation = true;
+                loadSequentialImages();
+            }
         }
-    }
-    
-    // If we have week images, set up week rotation
-    if (weekImages.length > 0) {
-        // Always start with the earliest available week
-        currentWeekIndex = 0;
-        
-        // Display the initial week
-        displayWeek(currentWeekIndex);
-        
-        // Start rotation between weeks if we have multiple
-        if (weekImages.length > 1) {
-            setInterval(rotateWeeks, 20000); // Rotate weeks every 20 seconds
-        }
-    } else {
-        // No week files found, fall back to sequential images
-        useSequentialRotation = true;
-        loadSequentialImages();
-    }
-}
         
         // Display a specific week's image
         function displayWeek(index) {
@@ -292,7 +292,7 @@ async function loadWeekFiles() {
                 
                 // Start rotation if we have multiple screenshots
                 if (loadedScreenshots.length > 1) {
-                    setInterval(rotateImages, 15000);
+                    setInterval(rotateImages, 20000);
                 }
             }
         }
