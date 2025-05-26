@@ -153,7 +153,7 @@ async function loadWeekFiles() {
     const potentialWeeks = [];
     
     // Add current week and up to 5 weeks ahead
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i <= 5; i++) {
         potentialWeeks.push(currentWeek + i);
     }
     
@@ -171,24 +171,8 @@ async function loadWeekFiles() {
     availableWeeks = [];
     weekImages = [];
     
-    // First, check if the current week image exists
-    const currentWeekUrl = basePath + `week_${currentWeek}.png`;
-    const currentWeekResult = await imageExists(currentWeekUrl);
-    
-    if (currentWeekResult.exists) {
-        availableWeeks.push(currentWeek.toString());
-        weekImages.push({
-            week: currentWeek.toString(),
-            image: currentWeekResult.img
-        });
-    }
-    
-    // Then check future weeks
+    // Check only current week and future weeks
     for (const week of potentialWeeks) {
-        // Skip if it's the current week (already checked) or a past week
-        if (week <= currentWeek) continue;
-        
-        // Check for week files
         const weekUrl = basePath + `week_${week}.png`;
         const result = await imageExists(weekUrl);
         
@@ -203,7 +187,7 @@ async function loadWeekFiles() {
     
     // If we have week images, set up week rotation
     if (weekImages.length > 0) {
-        // Always start with the earliest available week (which is current or future)
+        // Always start with the earliest available week
         currentWeekIndex = 0;
         
         // Display the initial week
