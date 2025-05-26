@@ -32,7 +32,6 @@
             height: 100%;
             opacity: 0;
             transition: opacity 1s ease-in-out;
-            /* object-fit set dynamically in JS */
         }
         
         .active {
@@ -74,6 +73,14 @@
             text-align: center;
             margin: 20% auto;
         }
+        
+        /* Full stretch mode - completely fills screen */
+        .full-stretch {
+            object-fit: fill !important;
+            width: 100% !important;
+            height: 100% !important;
+            transform: none !important;
+        }
     </style>
 </head>
 <body>
@@ -105,8 +112,8 @@
         // Get station from URL parameter, default to first station if not specified or invalid
         let station = getUrlParameter('station') || validStations[0];
         
-        // Get fitting mode from URL parameter, default to 'smart' (our custom fitting approach)
-        let fitMode = getUrlParameter('fit') || 'smart';
+        // Get fitting mode from URL parameter, default to 'fullstretch' for maximum screen coverage
+        let fitMode = getUrlParameter('fit') || 'fullstretch';
         
         // Validate station
         if (!validStations.includes(station)) {
@@ -114,8 +121,8 @@
         }
         
         // Validate fit mode
-        if (!['cover', 'contain', 'smart'].includes(fitMode)) {
-            fitMode = 'smart';
+        if (!['cover', 'contain', 'smart', 'fullstretch'].includes(fitMode)) {
+            fitMode = 'fullstretch';
         }
         
         // Base path for images
@@ -165,10 +172,13 @@
         let useSequentialRotation = false;
         const loadedScreenshots = []; // Array to store sequential screenshots
         
-        // Function to apply smart fitting to an image
-        function applySmartFit(img) {
-            if (fitMode === 'smart') {
-                // Once the image is loaded, check its dimensions
+        // Function to apply fitting mode to an image
+        function applyFitMode(img) {
+            if (fitMode === 'fullstretch') {
+                // Full stretch mode - completely fills screen with distortion
+                img.classList.add('full-stretch');
+            } else if (fitMode === 'smart') {
+                // Smart fit mode - balance between coverage and distortion
                 if (img.complete) {
                     smartFitImage(img);
                 } else {
@@ -177,7 +187,7 @@
                     };
                 }
             } else {
-                // Use the selected fit mode directly
+                // Standard object-fit modes (cover or contain)
                 img.style.objectFit = fitMode;
             }
         }
@@ -198,16 +208,17 @@
             
             // For wide (landscape) images that are wider than the screen ratio
             if (imgRatio > screenRatio) {
-                // Apply a custom transform to stretch vertically, but not too much
-                // Determine how much we need to stretch
-                const stretchRatio = Math.min(1.25, screenRatio / imgRatio);
-                
-                // Use cover combined with a scaleY transform for controlled vertical stretching
+                // Cover the entire width and apply aggressive vertical stretch
                 img.style.objectFit = 'cover';
-                img.style.transform = `scaleY(${stretchRatio})`;
+                
+                // Calculate how much stretch we need to eliminate black bars
+                const coverHeight = screenWidth / imgRatio;
+                const stretchFactor = screenHeight / coverHeight;
+                
+                img.style.transform = `scaleY(${stretchFactor})`;
             } else {
-                // For portrait or square images, use contain
-                img.style.objectFit = 'contain';
+                // For portrait or square images, use cover
+                img.style.objectFit = 'cover';
                 img.style.transform = '';
             }
         }
@@ -260,7 +271,7 @@
                 
                 // Start rotation between weeks if we have multiple
                 if (weekImages.length > 1) {
-                    setInterval(rotateWeeks, 15000); // Rotate weeks every 15 seconds
+                    setInterval(rotateWeeks, 20000); // Rotate weeks every 20 seconds
                 }
             } else {
                 // No week files found, fall back to sequential images
@@ -280,7 +291,7 @@
             img.className = 'screenshot active';
             
             // Apply appropriate fitting mode
-            applySmartFit(img);
+            applyFitMode(img);
             
             container.appendChild(img);
             
@@ -334,7 +345,7 @@
                 // Add all loaded screenshots to the container
                 loadedScreenshots.forEach((screenshot, idx) => {
                     // Apply appropriate fitting mode
-                    applySmartFit(screenshot.element);
+                    applyFitMode(screenshot.element);
                     
                     container.appendChild(screenshot.element);
                     if (idx === 0) {
@@ -344,7 +355,7 @@
                 
                 // Start rotation if we have multiple screenshots
                 if (loadedScreenshots.length > 1) {
-                    setInterval(rotateImages, 20000);
+                    setInterval(rotateImages, 15000);
                 }
             }
         }
@@ -401,14 +412,14 @@
         // Handle window resize to adjust image fitting
         window.addEventListener('resize', function() {
             if (!useSequentialRotation && weekImages.length > 0) {
-                // Re-apply smart fit to current week image
+                // Re-apply fit mode to current week image
                 const imgs = document.querySelectorAll('.screenshot.active');
-                if (imgs.length > 0) {
-                    applySmartFit(imgs[0]);
+                if (imgs.length > 0 && fitMode === 'smart') {
+                    smartFitImage(imgs[0]);
                 }
-            } else if (loadedScreenshots.length > 0) {
+            } else if (loadedScreenshots.length > 0 && fitMode === 'smart') {
                 // Re-apply smart fit to current sequential image
-                applySmartFit(loadedScreenshots[currentImageIndex].element);
+                smartFitImage(loadedScreenshots[currentImageIndex].element);
             }
         });
         
